@@ -3,7 +3,7 @@ name: sca
 on:
   push:
     branches: [main]
-  pull_request: {}
+  pull_request:
 
 jobs:
   sca_backend:
@@ -14,6 +14,8 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+          cache: maven
+      - run: mvn -B -q dependency:go-offline
       - run: |
           mkdir -p odc-reports
           docker run --rm -v "$PWD":/workspace -w /workspace owasp/dependency-check:latest \
@@ -35,8 +37,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
-      - run: npm install -g retire
+      - run: npm ci --ignore-scripts || true
       - run: npx retire --outputformat json --outputpath retirejs-report.json --severity high || true
       - uses: actions/upload-artifact@v4
         with:
