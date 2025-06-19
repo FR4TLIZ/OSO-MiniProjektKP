@@ -16,19 +16,19 @@ jobs:
           java-version: 17
           cache: maven
       - run: mvn -B -q dependency:go-offline
-      - name: dependency_check
-        run: |
+      - run: |
+          mkdir -p odc-reports
           docker run --rm -v "$PWD":/workspace -w /workspace owasp/dependency-check:latest \
             --project "Security Shepherd" \
-            -s . \
-            -f JSON \
-            -f HTML \
-            -o reports \
+            --scan /workspace \
+            --format JSON \
+            --format HTML \
+            --out /workspace/odc-reports \
             --failOnCVSS 7
       - uses: actions/upload-artifact@v4
         with:
           name: odc-report
-          path: reports
+          path: odc-reports
 
   sca_frontend:
     runs-on: ubuntu-latest
