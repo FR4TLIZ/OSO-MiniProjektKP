@@ -14,18 +14,17 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - name: Build project
-        run: mvn -B -q dependency:go-offline package -DskipTests
-      - name: Dependency Check
-        uses: dependency-check/Dependency-Check_Action@main
-        env:
-          JAVA_HOME: /opt/jdk
-        with:
-          project: Security Shepherd
-          path: .
-          format: HTML,JSON
-          args: --failOnCVSS 7
-          out: reports
+          cache: maven
+      - run: mvn -B -q dependency:go-offline
+      - name: dependency_check
+        run: |
+          docker run --rm -v "$PWD":/workspace -w /workspace owasp/dependency-check:latest \
+            --project "Security Shepherd" \
+            -s . \
+            -f JSON \
+            -f HTML \
+            -o reports \
+            --failOnCVSS 7
       - uses: actions/upload-artifact@v4
         with:
           name: odc-report
@@ -38,10 +37,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Install dependencies
-        run: npm ci --ignore-scripts || true
-      - name: Retire.js scan
-        run: npx retire --outputformat json --outputpath retirejs-report.json --severity high || true
+      - run: npm ci --ignore-scripts || true
+      - run: npx retire --outputformat json --outputpath retirejs-report.json --severity high || true
       - uses: actions/upload-artifact@v4
         with:
           name: retirejs-report
