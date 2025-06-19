@@ -289,24 +289,13 @@
 						<groupId>org.codehaus.mojo</groupId>
 						<artifactId>keytool-maven-plugin</artifactId>
 						<version>1.6</version>
-						<executions>
-							<execution>
-								<id>generate-tls-key</id>
-								<phase>generate-resources</phase>
-								<goals>
-									<goal>generateKeyPair</goal>
-								</goals>
-							</execution>
-						</executions>
-						<configuration>
-							<alias>${ALIAS}</alias>
-							<keyalg>${KEY_ALG}</keyalg>
-							<keystore>${basedir}/target/docker/tomcat/${TLS_KEYSTORE_FILE}</keystore>
-							<dname>${DNAME}</dname>
-							<storepass>${TLS_KEYSTORE_PASS}</storepass>
-							<keypass>${TLS_KEYSTORE_PASS}</keypass>
-							<deststoretype>${STORE_TYPE}</deststoretype>
-						</configuration>
+						<dependencies>
+							<dependency>
+								<groupId>org.codehaus.plexus</groupId>
+								<artifactId>plexus-utils</artifactId>
+								<version>3.0.24</version>
+							</dependency>
+						</dependencies>
 					</plugin>
 				</plugins>
 			</build>
