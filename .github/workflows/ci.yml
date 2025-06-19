@@ -68,17 +68,17 @@ jobs:
         with:
           config: p/java
 
-sca:
-  runs-on: ubuntu-latest
-  steps:
-    - uses: actions/checkout@v3
-
-    - name: Run OWASP Dependency-Check
-      uses: owasp-dep-check/gh-action@v1
-      with:
-        project: "SecurityShepherd"
-        scan: "."
-        format: "ALL"
+  sca:
+    name: Dependency scan (OWASP Dependency-Check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run OWASP Dependency-Check
+        uses: owasp-dep-check/gh-action@v1
+        with:
+          project: "SecurityShepherd"
+          path: "."
+          format: "ALL"
 
   secrets:
     name: Secrets scan (Gitleaks)
