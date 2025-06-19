@@ -1,4 +1,4 @@
-name: SCA
+name: sca
 
 on:
   push:
@@ -6,43 +6,42 @@ on:
   pull_request: {}
 
 jobs:
-  sca-maven:
+  sca_backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
+      - uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 17
-          cache: maven
+      - name: Build project
+        run: mvn -B -q package -DskipTests
+      - name: Reset JAVA_HOME
+        run: echo "JAVA_HOME=$JAVA_HOME_17_X64" >> $GITHUB_ENV
       - name: Dependency-Check
-        uses: dependency-check/Dependency-Check_Action@v3
+        uses: dependency-check/Dependency-Check_Action@main
         with:
           project: Security Shepherd
-          scan: .
+          path: .
           format: HTML,JSON
           args: --failOnCVSS 7
-      - name: Upload ODC report
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: odc-report
           path: reports
 
-  sca-js:
+  sca_frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - name: Install dependencies
         run: npm ci --ignore-scripts || true
       - name: Retire.js scan
         run: npx retire --outputformat json --outputpath retirejs-report.json --severity high || true
-      - name: Upload Retire.js report
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: retirejs-report
           path: retirejs-report.json
