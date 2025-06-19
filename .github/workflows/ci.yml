@@ -10,71 +10,48 @@ jobs:
     name: Build and Start Security Shepherd
     runs-on: ubuntu-latest
 
-    env:
-      DB_USER: shepherd
-      DB_PASS: password
-      CONTAINER_MARIADB: db
-      CONTAINER_TOMCAT: web
-      CONTAINER_MONGO: mongo
-      IMAGE_TOMCAT: shepherd-tomcat
-      IMAGE_MARIADB: shepherd-mariadb
-      IMAGE_MONGO: shepherd-mongo
-      DB_PORT_MAPPED_HOST: 3306
-      DB_SERVER_MAPPED_HOST: 127.0.0.1
-      MONGO_PORT_MAPPED_HOST: 27017
-      MONGO_SERVER_MAPPED_HOST: 127.0.0.1
-      DB_VERSION: 10.5
-      DB_BIND_ADDRESS: 0.0.0.0
-      MONGODB_VERSION: 6.0
-      MONGO_BIND_ADDRESS: 0.0.0.0
-      TOMCAT_DOCKER_VERSION: 9.0-jdk17
-      TLS_KEYSTORE_FILE: keystore.jks
-      TLS_KEYSTORE_PASS: secret
-      ALIAS: shepherd
-      HTTPS_PORT: 8443
-      HTTP_PORT: 8080
-      DOCKER_NETWORK_NAME: shepherd-network
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Generate .env for docker-compose
+      - name: Install Docker Compose
+        run: |
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.7/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose version
+
+      - name: Generate .env
         run: |
           cat <<EOF > .env
-          DB_USER=${{ env.DB_USER }}
-          DB_PASS=${{ env.DB_PASS }}
-          CONTAINER_MARIADB=${{ env.CONTAINER_MARIADB }}
-          CONTAINER_TOMCAT=${{ env.CONTAINER_TOMCAT }}
-          CONTAINER_MONGO=${{ env.CONTAINER_MONGO }}
-          IMAGE_TOMCAT=${{ env.IMAGE_TOMCAT }}
-          IMAGE_MARIADB=${{ env.IMAGE_MARIADB }}
-          IMAGE_MONGO=${{ env.IMAGE_MONGO }}
-          DB_PORT_MAPPED_HOST=${{ env.DB_PORT_MAPPED_HOST }}
-          DB_SERVER_MAPPED_HOST=${{ env.DB_SERVER_MAPPED_HOST }}
-          MONGO_PORT_MAPPED_HOST=${{ env.MONGO_PORT_MAPPED_HOST }}
-          MONGO_SERVER_MAPPED_HOST=${{ env.MONGO_SERVER_MAPPED_HOST }}
-          DB_VERSION=${{ env.DB_VERSION }}
-          DB_BIND_ADDRESS=${{ env.DB_BIND_ADDRESS }}
-          MONGODB_VERSION=${{ env.MONGODB_VERSION }}
-          MONGO_BIND_ADDRESS=${{ env.MONGO_BIND_ADDRESS }}
-          TOMCAT_DOCKER_VERSION=${{ env.TOMCAT_DOCKER_VERSION }}
-          TLS_KEYSTORE_FILE=${{ env.TLS_KEYSTORE_FILE }}
-          TLS_KEYSTORE_PASS=${{ env.TLS_KEYSTORE_PASS }}
-          ALIAS=${{ env.ALIAS }}
-          HTTPS_PORT=${{ env.HTTPS_PORT }}
-          HTTP_PORT=${{ env.HTTP_PORT }}
-          DOCKER_NETWORK_NAME=${{ env.DOCKER_NETWORK_NAME }}
+          DB_USER=shepherd
+          DB_PASS=password
+          CONTAINER_MARIADB=db
+          CONTAINER_TOMCAT=web
+          CONTAINER_MONGO=mongo
+          IMAGE_TOMCAT=shepherd-tomcat
+          IMAGE_MARIADB=shepherd-mariadb
+          IMAGE_MONGO=shepherd-mongo
+          DB_PORT_MAPPED_HOST=3306
+          DB_SERVER_MAPPED_HOST=127.0.0.1
+          MONGO_PORT_MAPPED_HOST=27017
+          MONGO_SERVER_MAPPED_HOST=127.0.0.1
+          DB_VERSION=10.5
+          DB_BIND_ADDRESS=0.0.0.0
+          MONGODB_VERSION=6
+          MONGO_BIND_ADDRESS=0.0.0.0
+          TOMCAT_DOCKER_VERSION=9.0-jdk17
+          TLS_KEYSTORE_FILE=keystore.jks
+          TLS_KEYSTORE_PASS=secret
+          ALIAS=shepherd
+          HTTPS_PORT=8443
+          HTTP_PORT=8080
+          DOCKER_NETWORK_NAME=shepherd-network
           EOF
 
-      - name: Build and start with docker-compose
+      - name: Build and run containers
         run: docker-compose up --build -d
 
-      - name: Wait for services to start
-        run: sleep 30
-
-      - name: Save built image
-        run: docker save ${{ env.IMAGE_TOMCAT }} > image.tar
+      - name: Save Docker image
+        run: docker save shepherd-tomcat > image.tar
 
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
@@ -96,10 +73,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Run Dependency-Check
-        uses: dependency-check/gh-action@main
+      - name: Run Dependency Check
+        uses: owasp/dependency-check-action@v1
         with:
-          args: --scan . --format ALL
+          project: "SecurityShepherd"
+          path: "."
+          format: "HTML"
 
   secrets:
     name: Secrets scan (Gitleaks)
@@ -109,8 +88,9 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
 
   trivy:
-    name: Container vulnerability scan (Trivy)
+    name: Container scan (Trivy)
     runs-on: ubuntu-latest
+    needs: build-and-run
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -120,7 +100,7 @@ jobs:
       - name: Load image
         run: docker load -i image.tar
 
-      - name: Trivy scan
+      - name: Scan with Trivy
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: shepherd-tomcat
@@ -128,21 +108,22 @@ jobs:
           exit-code: 0
 
   dast:
-    name: Dynamic security test (OWASP ZAP)
+    name: Dynamic scan (OWASP ZAP)
     runs-on: ubuntu-latest
+    needs: build-and-run
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: shepherd-image
           path: .
 
-      - name: Load and run container
+      - name: Load and run image
         run: |
           docker load -i image.tar
           docker run -d -p 8080:8080 --name shepherd shepherd-tomcat
           sleep 20
 
-      - name: Run ZAP baseline scan
+      - name: Run ZAP Baseline
         uses: zaproxy/action-baseline@v0.12.0
         with:
           target: http://localhost:8080
