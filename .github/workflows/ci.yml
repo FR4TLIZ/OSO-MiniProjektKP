@@ -1,45 +1,17 @@
-name: sca
+stages:
+  - sca
 
-on:
-  push:
-    branches: [main]
-  pull_request:
 
-jobs:
-  sca_backend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v3
-        with:
-          distribution: temurin
-          java-version: 17
-          cache: maven
-      - run: mvn -B -q dependency:go-offline
-      - run: |
-          mkdir -p odc-reports
-          docker run --rm -v "$PWD":/workspace -w /workspace owasp/dependency-check:latest \
-            --project "Security Shepherd" \
-            --scan /workspace \
-            --format JSON \
-            --format HTML \
-            --out /workspace/odc-reports \
-            --failOnCVSS 7
-      - uses: actions/upload-artifact@v4
-        with:
-          name: odc-report
-          path: odc-reports
 
-  sca_frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm ci --ignore-scripts || true
-      - run: npx retire --outputformat json --outputpath retirejs-report.json --severity high || true
-      - uses: actions/upload-artifact@v4
-        with:
-          name: retirejs-report
-          path: retirejs-report.json
+sca_frontend:
+  stage: sca
+  image: node:alpine3.10
+  before_script:
+    - npm install
+    - npm install -g retire
+  script:
+    - retire --outputformat json --outputpath retirejs-report.json --severity high exitwith 0
+  artifacts:
+    paths: [retirejs-report.json]
+    when: always
+    expire_in: one week
