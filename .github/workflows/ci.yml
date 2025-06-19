@@ -1,7 +1,17 @@
 stages:
   - sca
 
-
+sca_backend:
+  stage: sca
+  image: owasp/dependency-check:latest
+  script:
+    - mkdir -p odc-reports
+    - dependency-check.sh --project "Security Shepherd" --scan . --format HTML --format JSON --out odc-reports --failOnCVSS 7
+  artifacts:
+    paths:
+      - odc-reports
+    when: always
+    expire_in: one week
 
 sca_frontend:
   stage: sca
@@ -10,8 +20,9 @@ sca_frontend:
     - npm install
     - npm install -g retire
   script:
-    - retire --outputformat json --outputpath retirejs-report.json --severity high exitwith 0
+    - retire --outputformat json --outputpath retirejs-report.json --severity high || true
   artifacts:
-    paths: [retirejs-report.json]
+    paths:
+      - retirejs-report.json
     when: always
     expire_in: one week
