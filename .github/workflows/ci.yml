@@ -13,10 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Create directory for report
-        run: mkdir -p odc-reports
+      - name: Ensure report directory is clean
+        run: |
+          rm -rf odc-reports
+          mkdir -p odc-reports
 
-      - name: Run OWASP Dependency-Check (fail on CRITICAL, save report)
+      - name: Run OWASP Dependency-Check
         run: |
           docker run --rm \
             -v "$PWD:/src" \
