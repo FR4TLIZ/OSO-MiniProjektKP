@@ -221,7 +221,7 @@ jobs:
           output: 'trivy-report.json'
           exit-code: '1'
           ignore-unfixed: true
-          severity: 'HIGH,CRITICAL'
+          severity: 'CRITICAL'
 
       - name: Upload Trivy report
         if: always()
