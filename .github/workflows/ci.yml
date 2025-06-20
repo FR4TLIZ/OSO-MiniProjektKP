@@ -1,11 +1,11 @@
-# name: SCA
-#
-# on:
-#   push:
-#     branches: [main]
-#   pull_request:
-#
-# jobs:
+name: SCA
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
 #   sca_backend:
 #     runs-on: ubuntu-latest
 #     env:
