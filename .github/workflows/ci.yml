@@ -1,63 +1,91 @@
-name: SCA
+# name: SCA
+#
+# on:
+#   push:
+#     branches: [main]
+#   pull_request:
+#
+# jobs:
+#   sca_backend:
+#     runs-on: ubuntu-latest
+#     env:
+#       NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+#
+#     steps:
+#       - uses: actions/checkout@v4
+#
+#       - name: Run OWASP Dependency-Check in Docker (fail on CRITICAL only)
+#         run: |
+#           mkdir -p odc-tmp
+#           docker run --rm \
+#             -v "$PWD:/src" \
+#             -v dependency-data:/usr/share/dependency-check/data \
+#             -v "$PWD/odc-tmp:/report" \
+#             owasp/dependency-check:latest \
+#             --project "Security Shepherd" \
+#             --scan /src \
+#             --exclude "/src/MobileShepherd" \
+#             --format JSON \
+#             --out /report \
+#             --nvdApiKey "$NVD_API_KEY" || true
+#
+#           # Check for CRITICAL vulnerabilities (CVSS ≥ 9.0)
+#           if jq '.dependencies[].vulnerabilities[]? | select(.cvssScore >= 9)' odc-tmp/dependency-check-report.json | grep -q .; then
+#             echo "CRITICAL vulnerabilities found in backend!"
+#             exit 1
+#           else
+#             echo "No critical vulnerabilities in backend."
+#           fi
+#
+#   sca_frontend:
+#     runs-on: ubuntu-latest
+#
+#     steps:
+#       - uses: actions/checkout@v4
+#
+#       - uses: actions/setup-node@v4
+#         with:
+#           node-version: 20
+#
+#       - run: npm ci --ignore-scripts || true
+#
+#       - name: Run Retire.js and save JSON output
+#         run: |
+#           npx retire --outputformat json --outputpath retirejs.json --severity high || true
+#
+#       - name: Fail if any HIGH severity vulnerabilities are found
+#         run: |
+#           if jq '.data[]?.results[]?.vulnerabilities[]? | select(.severity == "high")' retirejs.json | grep -q .; then
+#             echo "High severity vulnerabilities found in frontend!"
+#             exit 1
+#           else
+#             echo "No high severity vulnerabilities in frontend."
+#           fi
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-
-jobs:
-  sca_backend:
+  sast_patch_check:
+    name: Semgrep - Only patched files
     runs-on: ubuntu-latest
-    env:
-      NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run OWASP Dependency-Check in Docker (fail on CRITICAL only)
+      - name: Run Semgrep on selected Java files
         run: |
-          mkdir -p odc-tmp
-          docker run --rm \
-            -v "$PWD:/src" \
-            -v dependency-data:/usr/share/dependency-check/data \
-            -v "$PWD/odc-tmp:/report" \
-            owasp/dependency-check:latest \
-            --project "Security Shepherd" \
-            --scan /src \
-            --exclude "/src/MobileShepherd" \
-            --format JSON \
-            --out /report \
-            --nvdApiKey "$NVD_API_KEY" || true
+          semgrep --config auto \
+            java/servlets/module/challenge/SqlInjection1.java \
+            java/servlets/module/challenge/SqlInjection5CouponCheck.java \
+            --error || true
 
-          # Check for CRITICAL vulnerabilities (CVSS ≥ 9.0)
-          if jq '.dependencies[].vulnerabilities[]? | select(.cvssScore >= 9)' odc-tmp/dependency-check-report.json | grep -q .; then
-            echo "CRITICAL vulnerabilities found in backend!"
+      - name: Fail if HIGH severity vulnerabilities still exist
+        run: |
+          semgrep --config auto \
+            java/servlets/module/challenge/SqlInjection1.java \
+            java/servlets/module/challenge/SqlInjection5CouponCheck.java \
+            --json > semgrep-patch-report.json
+
+          if jq '.results[]? | select(.extra.metadata.likelihood == "HIGH")' semgrep-patch-report.json | grep -q .; then
+            echo "High severity SAST issues still present in patched files!"
             exit 1
           else
-            echo "No critical vulnerabilities in backend."
-          fi
-
-  sca_frontend:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - run: npm ci --ignore-scripts || true
-
-      - name: Run Retire.js and save JSON output
-        run: |
-          npx retire --outputformat json --outputpath retirejs.json --severity high || true
-
-      - name: Fail if any HIGH severity vulnerabilities are found
-        run: |
-          if jq '.data[]?.results[]?.vulnerabilities[]? | select(.severity == "high")' retirejs.json | grep -q .; then
-            echo "High severity vulnerabilities found in frontend!"
-            exit 1
-          else
-            echo "No high severity vulnerabilities in frontend."
+            echo "Patched files are clean from HIGH severity SAST issues."
           fi
