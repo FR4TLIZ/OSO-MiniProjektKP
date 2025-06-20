@@ -252,11 +252,10 @@ jobs:
       - name: Log in to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-     - name: Build and push app image
+      - name: Build and push app image
         run: |
-          docker build -t ghcr.io/fr4tliz/oso-miniprojektkp/app:latest .
-          docker push ghcr.io/fr4tliz/oso-miniprojektkp/app:latest
-
+          docker build -t ${{ steps.vars.outputs.app_image }} .
+          docker push ${{ steps.vars.outputs.app_image }}
 
       - name: Build and push db image
         run: |
