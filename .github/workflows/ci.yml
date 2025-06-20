@@ -240,8 +240,10 @@ jobs:
 
     env:
       REGISTRY: ghcr.io
-      IMAGE_NAME_APP: ${{ github.repository }}/app
-      IMAGE_NAME_DB: ${{ github.repository }}/db
+      REPO_LOWERCASE: fr4tliz/oso-miniprojektkp
+      IMAGE_NAME_APP: ${{ env.REPO_LOWERCASE }}/app
+      IMAGE_NAME_DB: ${{ env.REPO_LOWERCASE }}/db
+
 
     steps:
       - name: Checkout code
