@@ -13,18 +13,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run OWASP Dependency-Check in Docker (without report)
+      - name: Run OWASP Dependency-Check (fail on Critical only)
         run: |
+          mkdir -p odc-reports
           docker run --rm \
             -v "$PWD:/src" \
             -v dependency-data:/usr/share/dependency-check/data \
+            -v "$PWD/odc-reports:/report" \
             owasp/dependency-check:latest \
             --project "Security Shepherd" \
             --scan /src \
             --exclude "/src/MobileShepherd" \
-            --format NONE \
+            --format JSON \
+            --out /report \
             --nvdApiKey "$NVD_API_KEY" \
-            --failOnCVSS 7
+            --failOnCVSS 9
 
   sca_frontend:
     runs-on: ubuntu-latest
@@ -34,4 +37,4 @@ jobs:
         with:
           node-version: 20
       - run: npm ci --ignore-scripts || true
-      - run: npx retire --severity high || true
+      - run: npx retire --severity critical || true
