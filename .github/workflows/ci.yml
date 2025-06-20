@@ -77,19 +77,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Semgrep (only patched files)
+      - name: Run Semgrep only on patched Java files
         run: |
           mkdir -p semgrep-reports
+
+          FILES=(
+            "src/main/java/servlets/module/challenge/SqlInjection1.java"
+            "src/main/java/servlets/module/challenge/SqlInjection5CouponCheck.java"
+          )
 
           docker run --rm \
             -v "$PWD:/src" \
             -w /src \
-            returntocorp/semgrep semgrep scan \
+            returntocorp/semgrep:1.96.0 semgrep scan \
             --config=p/owasp-top-ten \
+            --metrics=off \
             --json \
-            src/main/java/servlets/module/challenge/SqlInjection1.java \
-            src/main/java/servlets/module/challenge/SqlInjection5CouponCheck.java \
-            > semgrep-reports/semgrep-report.json
+            "${FILES[@]}" > semgrep-reports/semgrep-report.json
 
           echo "✅ Semgrep scan complete. Report: semgrep-reports/semgrep-report.json"
 
@@ -99,4 +103,3 @@ jobs:
           else
             echo "✅ Patched files are clean from HIGH likelihood + HIGH confidence issues."
           fi
-
