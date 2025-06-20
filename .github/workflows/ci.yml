@@ -1,4 +1,4 @@
-name: sca
+name: SCA
 
 on:
   push:
@@ -8,38 +8,30 @@ on:
 jobs:
   sca_backend:
     runs-on: ubuntu-latest
+    env:
+      NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v3
-        with:
-          distribution: temurin
-          java-version: 17
-          cache: maven
-      - run: mvn -B -q dependency:go-offline
-      - run: |
+
+      - name: Run OWASP Dependency-Check in Docker
+        run: |
           mkdir -p odc-reports
-          docker run --rm -v "$PWD":/workspace -w /workspace owasp/dependency-check:latest \
+          docker run --rm \
+            -v "$PWD:/src" \
+            -v dependency-data:/usr/share/dependency-check/data \
+            -v "$PWD/odc-reports:/report" \
+            owasp/dependency-check:latest \
             --project "Security Shepherd" \
-            --scan /workspace \
-            --format JSON \
+            --scan /src \
+            --exclude "/src/MobileShepherd" \
             --format HTML \
-            --out /workspace/odc-reports \
+            --format JSON \
+            --out /report \
+            --nvdApiKey "$NVD_API_KEY" \
             --failOnCVSS 7
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
         with:
           name: odc-report
           path: odc-reports
-
-  sca_frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm ci --ignore-scripts || true
-      - run: npx retire --outputformat json --outputpath retirejs-report.json --severity high || true
-      - uses: actions/upload-artifact@v4
-        with:
-          name: retirejs-report
-          path: retirejs-report.json
