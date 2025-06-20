@@ -1,154 +1,4 @@
-# name: Security Checks
-#
-# on:
-#   push:
-#     branches: [main]
-#   pull_request:
-#
-# jobs:
-#   sca_backend:
-#     runs-on: ubuntu-latest
-#     env:
-#       NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-#
-#     steps:
-#       - uses: actions/checkout@v4
-#
-#       - name: Run OWASP Dependency-Check in Docker (fail on CRITICAL only)
-#         run: |
-#           mkdir -p odc-tmp
-#           docker run --rm \
-#             -v "$PWD:/src" \
-#             -v dependency-data:/usr/share/dependency-check/data \
-#             -v "$PWD/odc-tmp:/report" \
-#             owasp/dependency-check:latest \
-#             --project "Security Shepherd" \
-#             --scan /src \
-#             --exclude "/src/MobileShepherd" \
-#             --format JSON \
-#             --out /report \
-#             --nvdApiKey "$NVD_API_KEY" || true
-#
-#           if jq '.dependencies[].vulnerabilities[]? | select(.cvssScore >= 9)' odc-tmp/dependency-check-report.json | grep -q .; then
-#             echo "CRITICAL vulnerabilities found in backend!"
-#             exit 1
-#           else
-#             echo "No critical vulnerabilities in backend."
-#           fi
-#
-#   sca_frontend:
-#     runs-on: ubuntu-latest
-#
-#     steps:
-#       - uses: actions/checkout@v4
-#
-#       - uses: actions/setup-node@v4
-#         with:
-#           node-version: 20
-#
-#       - run: npm ci --ignore-scripts || true
-#
-#       - name: Run Retire.js and save JSON output
-#         run: |
-#           npx retire --outputformat json --outputpath retirejs.json --severity high || true
-#
-#       - name: Fail if any HIGH severity vulnerabilities are found
-#         run: |
-#           if jq '.data[]?.results[]?.vulnerabilities[]? | select(.severity == "high")' retirejs.json | grep -q .; then
-#             echo "High severity vulnerabilities found in frontend!"
-#             exit 1
-#           else
-#             echo "No high severity vulnerabilities in frontend."
-#           fi
-#
-#   sast_patch_check:
-#     runs-on: ubuntu-latest
-#
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
-#
-#       - name: Run Semgrep only on patched Java files
-#         run: |
-#           mkdir -p semgrep-reports
-#
-#           FILES=(
-#             "src/main/java/servlets/module/challenge/SqlInjection1.java"
-#             "src/main/java/servlets/module/challenge/SqlInjection5CouponCheck.java"
-#           )
-#
-#           echo "Checked files::"
-#           for f in "${FILES[@]}"; do
-#             if [[ -f "$f" ]]; then
-#               echo "  $f"
-#             else
-#               echo "  Not found: $f"
-#             fi
-#           done
-#
-#           docker run --rm \
-#             -v "$PWD:/src" \
-#             -w /src \
-#             returntocorp/semgrep:1.96.0 semgrep scan \
-#             --config=p/owasp-top-ten \
-#             --metrics=off \
-#             --json \
-#             "${FILES[@]}" > semgrep-reports/semgrep-report.json
-#
-#           echo "Semgrep scan complete. Report: semgrep-reports/semgrep-report.json"
-#
-#           if jq '.results[]? | select(.extra.metadata.likelihood == "HIGH" and .extra.metadata.confidence == "HIGH")' semgrep-reports/semgrep-report.json | grep -q .; then
-#             echo "High+High severity SAST issues found in patched files!"
-#             exit 1
-#           else
-#             echo "Patched files are clean from HIGH likelihood + HIGH confidence issues."
-#           fi
-#
-#       - name: Upload Semgrep JSON report
-#         uses: actions/upload-artifact@v4
-#         with:
-#           name: semgrep-patch-report
-#           path: semgrep-reports/semgrep-report.json
-#
-#   secrets_scan_trufflehog:
-#     runs-on: ubuntu-latest
-#
-#     steps:
-#       - name: Checkout repository
-#         uses: actions/checkout@v4
-#
-#       - name: Run TruffleHog scan
-#         run: |
-#           REPORT_DIR="trufflehog-reports"
-#           mkdir -p "$REPORT_DIR"
-#
-#           echo "Start of scan via TruffleHog..."
-#
-#           docker run --rm \
-#             -v "$(pwd):/repo" \
-#             trufflesecurity/trufflehog:latest \
-#             git file:///repo \
-#             --only-verified \
-#             --branch main \
-#             --json \
-#             > "$REPORT_DIR/trufflehog-report.json"
-#
-#           if jq '.[]?' "$REPORT_DIR/trufflehog-report.json" | grep -q .; then
-#             echo "TruffleHog found some secrets! Check $REPORT_DIR/trufflehog-report.json"
-#             exit 1
-#           else
-#             echo "TruffleHog didn't found any secrets"
-#           fi
-#
-#       - name: Upload TruffleHog JSON report
-#         uses: actions/upload-artifact@v4
-#         with:
-#           name: trufflehog-report
-#           path: trufflehog-reports/trufflehog-report.json
-
-
-
-name: zap-dast
+name: Security Checks
 
 on:
   push:
@@ -156,44 +6,142 @@ on:
   pull_request:
 
 jobs:
-  zap-scan:
+  sca_backend:
     runs-on: ubuntu-latest
-    timeout-minutes: 60           # fail, gdy ZAP się zawiesi
-
-    services:
-      app:                        # ⬅️ Twoja aplikacja uruchomiona w tle
-        image: ghcr.io/your-org/your-app:latest
-        ports:
-          - 8080:8080             # zmień jeżeli inny port
-        options: >-
-          --health-cmd="curl -fs http://localhost:8080/health || exit 1"
-          --health-interval=10s
-          --health-retries=30
+    env:
+      NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
 
     steps:
-      - name: Checkout (tylko po to, by mieć artefakty w repo)
+      - uses: actions/checkout@v4
+
+      - name: Run OWASP Dependency-Check in Docker (fail on CRITICAL only)
+        run: |
+          mkdir -p odc-tmp
+          docker run --rm \
+            -v "$PWD:/src" \
+            -v dependency-data:/usr/share/dependency-check/data \
+            -v "$PWD/odc-tmp:/report" \
+            owasp/dependency-check:latest \
+            --project "Security Shepherd" \
+            --scan /src \
+            --exclude "/src/MobileShepherd" \
+            --format JSON \
+            --out /report \
+            --nvdApiKey "$NVD_API_KEY" || true
+
+          if jq '.dependencies[].vulnerabilities[]? | select(.cvssScore >= 9)' odc-tmp/dependency-check-report.json | grep -q .; then
+            echo "CRITICAL vulnerabilities found in backend!"
+            exit 1
+          else
+            echo "No critical vulnerabilities in backend."
+          fi
+
+  sca_frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci --ignore-scripts || true
+
+      - name: Run Retire.js and save JSON output
+        run: |
+          npx retire --outputformat json --outputpath retirejs.json --severity high || true
+
+      - name: Fail if any HIGH severity vulnerabilities are found
+        run: |
+          if jq '.data[]?.results[]?.vulnerabilities[]? | select(.severity == "high")' retirejs.json | grep -q .; then
+            echo "High severity vulnerabilities found in frontend!"
+            exit 1
+          else
+            echo "No high severity vulnerabilities in frontend."
+          fi
+
+  sast_patch_check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1️⃣  Pasive + Active scan (full scan)
-      - name: Run ZAP full scan
-        uses: zaproxy/action-full-scan@v0.10.0
-        with:
-          target: "http://app:8080/"
-          fail_action: true                 # przerwij przy Medium/High
-          cmd_options: >
-            -w zap-report.html              # raport HTML
-            -x zap-report.xml               # raport XML
-            -J zap-report.json              # raport JSON
-            -I                              # ignoruj jeśli brak 200 OK
-            -r                              # inkluduj podsumowanie w logu
+      - name: Run Semgrep only on patched Java files
+        run: |
+          mkdir -p semgrep-reports
 
-      # 2️⃣  Artefakty
-      - name: Upload ZAP reports
+          FILES=(
+            "src/main/java/servlets/module/challenge/SqlInjection1.java"
+            "src/main/java/servlets/module/challenge/SqlInjection5CouponCheck.java"
+          )
+
+          echo "Checked files::"
+          for f in "${FILES[@]}"; do
+            if [[ -f "$f" ]]; then
+              echo "  $f"
+            else
+              echo "  Not found: $f"
+            fi
+          done
+
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            returntocorp/semgrep:1.96.0 semgrep scan \
+            --config=p/owasp-top-ten \
+            --metrics=off \
+            --json \
+            "${FILES[@]}" > semgrep-reports/semgrep-report.json
+
+          echo "Semgrep scan complete. Report: semgrep-reports/semgrep-report.json"
+
+          if jq '.results[]? | select(.extra.metadata.likelihood == "HIGH" and .extra.metadata.confidence == "HIGH")' semgrep-reports/semgrep-report.json | grep -q .; then
+            echo "High+High severity SAST issues found in patched files!"
+            exit 1
+          else
+            echo "Patched files are clean from HIGH likelihood + HIGH confidence issues."
+          fi
+
+      - name: Upload Semgrep JSON report
         uses: actions/upload-artifact@v4
         with:
-          name: zap-reports
-          path: |
-            zap-report.html
-            zap-report.xml
-            zap-report.json
+          name: semgrep-patch-report
+          path: semgrep-reports/semgrep-report.json
 
+  secrets_scan_trufflehog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run TruffleHog scan
+        run: |
+          REPORT_DIR="trufflehog-reports"
+          mkdir -p "$REPORT_DIR"
+
+          echo "Start of scan via TruffleHog..."
+
+          docker run --rm \
+            -v "$(pwd):/repo" \
+            trufflesecurity/trufflehog:latest \
+            git file:///repo \
+            --only-verified \
+            --branch main \
+            --json \
+            > "$REPORT_DIR/trufflehog-report.json"
+
+          if jq '.[]?' "$REPORT_DIR/trufflehog-report.json" | grep -q .; then
+            echo "TruffleHog found some secrets! Check $REPORT_DIR/trufflehog-report.json"
+            exit 1
+          else
+            echo "TruffleHog didn't found any secrets"
+          fi
+
+      - name: Upload TruffleHog JSON report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trufflehog-report
+          path: trufflehog-reports/trufflehog-report.json
