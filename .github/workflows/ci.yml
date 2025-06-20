@@ -231,34 +231,44 @@ jobs:
           path: trivy-report.json
 
   release:
-    name: Release Docker Images
-    runs-on: ubuntu-latest
+  name: Release Docker Images
+  runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      packages: write
+  permissions:
+    contents: read
+    packages: write
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Set lowercase image names
-        id: vars
-        run: |
-          REPO_LOWERCASE=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          echo "app_image=ghcr.io/${REPO_LOWERCASE}/app:latest" >> "$GITHUB_OUTPUT"
-          echo "db_image=ghcr.io/${REPO_LOWERCASE}/db:latest" >> "$GITHUB_OUTPUT"
+    - name: Set lowercase image names
+      id: vars
+      run: |
+        REPO_LOWERCASE=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+        echo "app_image=ghcr.io/${REPO_LOWERCASE}/app:latest" >> "$GITHUB_OUTPUT"
+        echo "db_image=ghcr.io/${REPO_LOWERCASE}/db:latest" >> "$GITHUB_OUTPUT"
 
-      - name: Log in to GitHub Container Registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
 
-      - name: Build and push app image
-        run: |
-          docker build -t ${{ steps.vars.outputs.app_image }} .
-          docker push ${{ steps.vars.outputs.app_image }}
+    - name: Build WAR file
+      run: mvn clean package -DskipTests
 
-      - name: Build and push db image
-        run: |
-          docker build -f Dockerfile.db -t ${{ steps.vars.outputs.db_image }} .
-          docker push ${{ steps.vars.outputs.db_image }}
+    - name: Log in to GitHub Container Registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+    - name: Build and push app image
+      run: |
+        docker build -t ${{ steps.vars.outputs.app_image }} .
+        docker push ${{ steps.vars.outputs.app_image }}
+
+    - name: Build and push db image
+      run: |
+        docker build -f Dockerfile.db -t ${{ steps.vars.outputs.db_image }} .
+        docker push ${{ steps.vars.outputs.db_image }}
+
 
