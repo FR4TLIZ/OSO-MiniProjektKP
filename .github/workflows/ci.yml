@@ -2,7 +2,7 @@ name: Security Checks
 
 on:
   push:
-    branches: [nowy_branch]
+    branches: [nowy-branch]
   pull_request:
 
 jobs:
