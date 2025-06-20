@@ -13,17 +13,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run OWASP Dependency-Check (fail on CRITICAL only, no reports)
+      - name: Create directory for report
+        run: mkdir -p odc-reports
+
+      - name: Run OWASP Dependency-Check (fail on CRITICAL, save report)
         run: |
           docker run --rm \
             -v "$PWD:/src" \
             -v dependency-data:/usr/share/dependency-check/data \
+            -v "$PWD/odc-reports:/report" \
             owasp/dependency-check:latest \
             --project "Security Shepherd" \
             --scan /src \
             --exclude "/src/MobileShepherd" \
+            --format HTML \
+            --out /report \
             --nvdApiKey "$NVD_API_KEY" \
             --failOnCVSS 9
+
+      - name: Upload dependency-check report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: odc-reports/
 
   sca_frontend:
     runs-on: ubuntu-latest
@@ -33,4 +45,8 @@ jobs:
         with:
           node-version: 20
       - run: npm ci --ignore-scripts || true
-      - run: npx retire --severity high || true
+      - run: npx retire --outputformat json --outputpath retirejs-report.json --severity high || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: retirejs-report
+          path: retirejs-report.json
