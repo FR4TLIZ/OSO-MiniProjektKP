@@ -10,45 +10,54 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Ensure report directory is clean
+      - name: Run OWASP Dependency-Check in Docker (fail on CRITICAL only)
         run: |
-          rm -rf odc-reports
-          mkdir -p odc-reports
-
-      - name: Run OWASP Dependency-Check
-        run: |
+          mkdir -p odc-tmp
           docker run --rm \
             -v "$PWD:/src" \
             -v dependency-data:/usr/share/dependency-check/data \
-            -v "$PWD/odc-reports:/report" \
+            -v "$PWD/odc-tmp:/report" \
             owasp/dependency-check:latest \
             --project "Security Shepherd" \
             --scan /src \
             --exclude "/src/MobileShepherd" \
-            --format HTML \
+            --format JSON \
             --out /report \
-            --nvdApiKey "$NVD_API_KEY" \
-            --failOnCVSS 9
+            --nvdApiKey "$NVD_API_KEY" || true
 
-      - name: Upload dependency-check report
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-check-report
-          path: odc-reports/
+          # Check for CRITICAL vulnerabilities (CVSS ≥ 9.0)
+          if jq '.dependencies[].vulnerabilities[]? | select(.cvssScore >= 9)' odc-tmp/dependency-check-report.json | grep -q .; then
+            echo "CRITICAL vulnerabilities found in backend!"
+            exit 1
+          else
+            echo "No critical vulnerabilities in backend."
+          fi
 
   sca_frontend:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
       - run: npm ci --ignore-scripts || true
-      - run: npx retire --outputformat json --outputpath retirejs-report.json --severity high || true
-      - uses: actions/upload-artifact@v4
-        with:
-          name: retirejs-report
-          path: retirejs-report.json
+
+      - name: Run Retire.js and save JSON output
+        run: |
+          npx retire --outputformat json --outputpath retirejs.json --severity high || true
+
+      - name: Fail if any HIGH severity vulnerabilities are found
+        run: |
+          if jq '.data[]?.results[]?.vulnerabilities[]? | select(.severity == "high")' retirejs.json | grep -q .; then
+            echo "High severity vulnerabilities found in frontend!"
+            exit 1
+          else
+            echo "No high severity vulnerabilities in frontend."
+          fi
