@@ -79,7 +79,10 @@ public class SqlInjection1 extends HttpServlet {
 
       try {
         String aUserId = request.getParameter("aUserId");
-        log.debug("User Submitted - " + aUserId);
+          if (!aUserId.matches("\\d+")) {
+              throw new IllegalArgumentException("Invalid user ID");
+          }
+        log.debug("User Submitted - {}", aUserId);
         String ApplicationRoot = getServletContext().getRealPath("");
         log.debug("Servlet root = " + ApplicationRoot);
 
@@ -87,8 +90,9 @@ public class SqlInjection1 extends HttpServlet {
         Connection conn = Database.getChallengeConnection(ApplicationRoot, "SqlChallengeOne");
         Statement stmt = conn.createStatement();
         log.debug("Gathering result set");
-        ResultSet resultSet =
-            stmt.executeQuery("SELECT * FROM customers WHERE customerId = \"" + aUserId + "\"");
+        PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM customers WHERE customerId = ?");
+          pstmt.setString(1, aUserId);
+          ResultSet resultSet = pstmt.executeQuery();
 
         int i = 0;
         htmlOutput = "<h2 class='title'>" + bundle.getString("response.searchResults") + "</h2>";
@@ -129,7 +133,7 @@ public class SqlInjection1 extends HttpServlet {
                 + "</p>";
       } catch (Exception e) {
         out.write(errors.getString("error.funky"));
-        log.fatal(levelName + " - " + e.toString());
+        log.fatal(levelName + " - {}", e.getMessage());
       }
       log.debug("Outputting HTML");
       out.write(htmlOutput);
