@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run OWASP Dependency-Check (fail on CRITICAL only)
+      - name: Run OWASP Dependency-Check (fail on CRITICAL only, no reports)
         run: |
           docker run --rm \
             -v "$PWD:/src" \
@@ -22,7 +22,6 @@ jobs:
             --project "Security Shepherd" \
             --scan /src \
             --exclude "/src/MobileShepherd" \
-            --format NONE \
             --nvdApiKey "$NVD_API_KEY" \
             --failOnCVSS 9
 
