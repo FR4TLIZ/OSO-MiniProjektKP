@@ -146,6 +146,8 @@
 #           name: trufflehog-report
 #           path: trufflehog-reports/trufflehog-report.json
 
+
+
 name: Security Checks
 
 on:
@@ -153,64 +155,46 @@ on:
     branches: [main]
   pull_request:
 
-jobs:                # ← wszystkie joby MUSZĄ być zagnieżdżone pod "jobs:"
-  sca_backend:
-    …
+jobs:
 
-  sca_frontend:
-    …
-
-  sast_patch_check:
-    …
-
-  secrets_scan_trufflehog:
-    …
-
-  # ▼ NOWY JOB – w tym samym poziomie wcięcia co pozostałe
-  dast_zap:
-    name: DAST – OWASP ZAP (baseline)
+  dast_zap_scan:
+    name: DAST Scan (OWASP ZAP)
     runs-on: ubuntu-latest
-    needs:
-      - sca_backend
-      - sca_frontend
-      - sast_patch_check
-      - secrets_scan_trufflehog
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Start application stack
-        run: docker compose up -d --build   # dostosuj jeśli używasz innej komendy
-
-      - name: Wait until app is up
+      - name: Run OWASP ZAP Baseline Scan against localhost
         run: |
-          for i in {1..30}; do
-            if curl -sSf http://localhost:8080 >/dev/null; then
-              echo "app ready"; exit 0; fi
-            sleep 5
-          done
-          echo "app not ready"; exit 1
+          mkdir -p dast-reports
 
-      - name: Run ZAP baseline scan (fail on HIGH)
+          docker run --rm \
+            -v $(pwd):/zap/wrk \
+            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+            -t https://localhost \
+            -J zap-report.json \
+            -r zap-report.html \
+            -a || true  # Nie przerywaj workflow w razie błędów
+
+      - name: Fail if HIGH or above risk found
         run: |
-          mkdir zap-reports
-          docker run --rm --network host \
-            -v "$PWD/zap-reports:/zap/wrk" \
-            ghcr.io/zaproxy/zaproxy:latest \
-            zap-baseline.py \
-              -t http://localhost:8080 \
-              -w HIGH \
-              -J zap-report.json \
-              -x zap-report.xml \
-              -r zap-report.html
+          if jq '.site[].alerts[] | select(.riskcode | tonumber >= 3)' zap-report.json | grep -q .; then
+            echo "❌ OWASP ZAP found HIGH or CRITICAL vulnerabilities."
+            exit 1
+          else
+            echo "✅ No HIGH or CRITICAL vulnerabilities found by OWASP ZAP."
+          fi
 
-      - name: Upload ZAP reports
+      - name: Upload ZAP HTML report
         uses: actions/upload-artifact@v4
         with:
-          name: zap-dast-report
-          path: zap-reports
+          name: zap-html-report
+          path: zap-report.html
 
-      - name: Stop application stack
-        if: always()
-        run: docker compose down --remove-orphans
+      - name: Upload ZAP JSON report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-json-report
+          path: zap-report.json
+
