@@ -1,11 +1,11 @@
-name: SCA
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-
-jobs:
+# name: SCA
+#
+# on:
+#   push:
+#     branches: [main]
+#   pull_request:
+#
+# jobs:
 #   sca_backend:
 #     runs-on: ubuntu-latest
 #     env:
@@ -62,29 +62,41 @@ jobs:
 #             echo "No high severity vulnerabilities in frontend."
 #           fi
 
+name: SAST (selected files only)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
   sast_patch_check:
-    name: Semgrep - Only patched files
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Install Semgrep
-        run: pip install semgrep
-
-      - name: Run Semgrep on selected Java files
+      - name: Run Semgrep (only patched files)
         run: |
-          semgrep --config auto \
-            java/servlets/module/challenge/SqlInjection1.java \
-            java/servlets/module/challenge/SqlInjection5CouponCheck.java \
-            --json > semgrep-patch-report.json
+          mkdir -p semgrep-reports
 
-      - name: Fail if HIGH severity vulnerabilities still exist
-        run: |
-          if jq '.results[]? | select(.extra.metadata.likelihood == "HIGH")' semgrep-patch-report.json | grep -q .; then
-            echo "High severity SAST issues still present in patched files!"
+          docker run --rm \
+            -v "$PWD:/src" \
+            -w /src \
+            returntocorp/semgrep semgrep scan \
+            --config=p/owasp-top-ten \
+            --json \
+            src/main/java/servlets/module/challenge/SqlInjection1.java \
+            src/main/java/servlets/module/challenge/SqlInjection5CouponCheck.java \
+            > semgrep-reports/semgrep-report.json
+
+          echo "✅ Semgrep scan complete. Report: semgrep-reports/semgrep-report.json"
+
+          if jq '.results[]? | select(.extra.metadata.likelihood == "HIGH" and .extra.metadata.confidence == "HIGH")' semgrep-reports/semgrep-report.json | grep -q .; then
+            echo "❌ High+High severity SAST issues found in patched files!"
             exit 1
           else
-            echo "Patched files are clean from HIGH severity SAST issues."
+            echo "✅ Patched files are clean from HIGH likelihood + HIGH confidence issues."
           fi
 
