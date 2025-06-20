@@ -238,26 +238,27 @@ jobs:
       contents: read
       packages: write
 
-    env:
-      REGISTRY: ghcr.io
-      REPO_LOWERCASE: fr4tliz/oso-miniprojektkp
-      IMAGE_NAME_APP: ${{ env.REPO_LOWERCASE }}/app
-      IMAGE_NAME_DB: ${{ env.REPO_LOWERCASE }}/db
-
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set lowercase image names
+        id: vars
+        run: |
+          REPO_LOWERCASE=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "app_image=ghcr.io/${REPO_LOWERCASE}/app:latest" >> "$GITHUB_OUTPUT"
+          echo "db_image=ghcr.io/${REPO_LOWERCASE}/db:latest" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Build and push app image
         run: |
-          docker build -f Dockerfile.app -t ghcr.io/${{ env.IMAGE_NAME_APP }}:latest .
-          docker push ghcr.io/${{ env.IMAGE_NAME_APP }}:latest
+          docker build -f Dockerfile.app -t ${{ steps.vars.outputs.app_image }} .
+          docker push ${{ steps.vars.outputs.app_image }}
 
       - name: Build and push db image
         run: |
-          docker build -f Dockerfile.db -t ghcr.io/${{ env.IMAGE_NAME_DB }}:latest .
-          docker push ghcr.io/${{ env.IMAGE_NAME_DB }}:latest
+          docker build -f Dockerfile.db -t ${{ steps.vars.outputs.db_image }} .
+          docker push ${{ steps.vars.outputs.db_image }}
+
