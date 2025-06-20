@@ -188,34 +188,45 @@ jobs:
   #         path: zap-report.json
 
   container_image_scan_trivy:
-    name: Scan container image with Trivy
+    name: scan_trivy
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Build backend WAR
+        run: mvn clean package -DskipTests
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image (no push)
+      - name: Build Docker image
         run: |
           docker build -t twoja_aplikacja:latest \
             --build-arg TLS_KEYSTORE_FILE=keystore.jks \
             --build-arg TOMCAT_DOCKER_VERSION=9.0.99 .
 
-      - name: Scan Docker image with Trivy
+      - name: Scan image with Trivy
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: 'twoja_aplikacja:latest'
-          format: 'table'
+          format: 'json'
+          output: 'trivy-report.json'
           exit-code: '1'
           ignore-unfixed: true
           severity: 'HIGH,CRITICAL'
 
-      - name: Upload Trivy Report (optional)
+      - name: Upload Trivy report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: trivy-report
           path: trivy-report.json
+
