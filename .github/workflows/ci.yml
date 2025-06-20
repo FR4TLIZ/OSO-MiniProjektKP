@@ -35,3 +35,17 @@ jobs:
         with:
           name: odc-report
           path: odc-reports
+
+  sca_frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci --ignore-scripts || true
+      - run: npx retire --outputformat json --outputpath retirejs-report.json --severity high || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: retirejs-report
+          path: retirejs-report.json
