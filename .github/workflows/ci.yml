@@ -69,23 +69,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run Semgrep on selected Java files
-        run: |
-          semgrep --config auto \
-            java/servlets/module/challenge/SqlInjection1.java \
-            java/servlets/module/challenge/SqlInjection5CouponCheck.java \
-            --error || true
+      - name: Install Semgrep
+        run: pip install semgrep
 
-      - name: Fail if HIGH severity vulnerabilities still exist
+      - name: Run Semgrep on selected Java files
         run: |
           semgrep --config auto \
             java/servlets/module/challenge/SqlInjection1.java \
             java/servlets/module/challenge/SqlInjection5CouponCheck.java \
             --json > semgrep-patch-report.json
 
+      - name: Fail if HIGH severity vulnerabilities still exist
+        run: |
           if jq '.results[]? | select(.extra.metadata.likelihood == "HIGH")' semgrep-patch-report.json | grep -q .; then
             echo "High severity SAST issues still present in patched files!"
             exit 1
           else
             echo "Patched files are clean from HIGH severity SAST issues."
           fi
+
