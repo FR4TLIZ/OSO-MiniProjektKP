@@ -146,6 +146,12 @@
 #           name: trufflehog-report
 #           path: trufflehog-reports/trufflehog-report.json
 
+name: Security Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
 
 # ▼ wklej cały blok obok pozostałych jobów
   dast_zap:
