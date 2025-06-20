@@ -151,9 +151,9 @@
 name: zap-dast
 
 on:
-  workflow_dispatch:      # ręczne uruchomienie
-  schedule:               # lub np. codzienny skan o 2:30
-    - cron: '30 2 * * *'
+  push:
+    branches: [main]
+  pull_request:
 
 jobs:
   zap-scan:
