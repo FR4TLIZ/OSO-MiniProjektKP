@@ -262,5 +262,8 @@ jobs:
           docker build -f Dockerfile.db -t ${{ steps.vars.outputs.db_image }} .
           docker push ${{ steps.vars.outputs.db_image }}
 
+      - name: Build WAR
+        run: mvn clean package -DskipTests
+
 
 
