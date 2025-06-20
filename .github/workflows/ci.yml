@@ -242,6 +242,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Build WAR file
+        run: mvn clean package -DskipTests
+
       - name: Set lowercase image names
         id: vars
         run: |
@@ -262,8 +271,6 @@ jobs:
           docker build -f Dockerfile.db -t ${{ steps.vars.outputs.db_image }} .
           docker push ${{ steps.vars.outputs.db_image }}
 
-      - name: Build WAR
-        run: mvn clean package -DskipTests
 
 
 
