@@ -2,7 +2,7 @@ name: Security Checks
 
 on:
   push:
-    branches: [nowy-branch]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -230,3 +230,32 @@ jobs:
           name: trivy-report
           path: trivy-report.json
 
+  release:
+    name: Release Docker Images
+    runs-on: ubuntu-latest
+
+    permissions:
+        contents: read
+        packages: write  # <-- pozwala pushować do GitHub Container Registry
+
+    env:
+        REGISTRY: ghcr.io
+        IMAGE_NAME_APP: ${{ github.repository }}/app
+        IMAGE_NAME_DB: ${{ github.repository }}/db
+
+    steps:
+        - name: Checkout code
+        uses: actions/checkout@v4
+
+        - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+        - name: Build and push app image
+        run: |
+            docker build -f Dockerfile.app -t ghcr.io/${{ env.IMAGE_NAME_APP }}:latest .
+            docker push ghcr.io/${{ env.IMAGE_NAME_APP }}:latest
+
+        - name: Build and push db image
+        run: |
+            docker build -f Dockerfile.db -t ghcr.io/${{ env.IMAGE_NAME_DB }}:latest .
+            docker push ghcr.io/${{ env.IMAGE_NAME_DB }}:latest
