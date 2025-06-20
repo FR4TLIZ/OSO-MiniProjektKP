@@ -86,6 +86,15 @@ jobs:
             "src/main/java/servlets/module/challenge/SqlInjection5CouponCheck.java"
           )
 
+          echo "🔍 Sprawdzane pliki:"
+          for f in "${FILES[@]}"; do
+            if [[ -f "$f" ]]; then
+              echo "  ✅ $f"
+            else
+              echo "  ❌ Nie znaleziono: $f"
+            fi
+          done
+
           docker run --rm \
             -v "$PWD:/src" \
             -w /src \
@@ -103,3 +112,9 @@ jobs:
           else
             echo "✅ Patched files are clean from HIGH likelihood + HIGH confidence issues."
           fi
+
+      - name: Upload Semgrep JSON report
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-patch-report
+          path: semgrep-reports/semgrep-report.json
