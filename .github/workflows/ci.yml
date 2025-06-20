@@ -153,12 +153,23 @@ on:
     branches: [main]
   pull_request:
 
-# ▼ wklej cały blok obok pozostałych jobów
+jobs:                # ← wszystkie joby MUSZĄ być zagnieżdżone pod "jobs:"
+  sca_backend:
+    …
+
+  sca_frontend:
+    …
+
+  sast_patch_check:
+    …
+
+  secrets_scan_trufflehog:
+    …
+
+  # ▼ NOWY JOB – w tym samym poziomie wcięcia co pozostałe
   dast_zap:
     name: DAST – OWASP ZAP (baseline)
     runs-on: ubuntu-latest
-
-    # jeśli chcesz, aby uruchamiał się dopiero po zakończeniu poprzednich etapów:
     needs:
       - sca_backend
       - sca_frontend
@@ -169,48 +180,37 @@ on:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # ▶️ zbuduj i odpal kontenery aplikacji
       - name: Start application stack
-        run: |
-          docker compose -f docker-compose.yml up -d --build
+        run: docker compose up -d --build   # dostosuj jeśli używasz innej komendy
 
-      # ⏳ poczekaj aż endpoint zacznie odpowiadać
       - name: Wait until app is up
         run: |
-          echo "Waiting for http://localhost:8080 ..."
           for i in {1..30}; do
-            if curl -sSf http://localhost:8080 >/dev/null 2>&1; then
-              echo "✅ App is up"
-              exit 0
-            fi
-            echo "⏳ ($i/30) still down – sleeping 5s"
+            if curl -sSf http://localhost:8080 >/dev/null; then
+              echo "app ready"; exit 0; fi
             sleep 5
           done
-          echo "❌ App did not start in time" && docker compose logs && exit 1
+          echo "app not ready"; exit 1
 
-      # 🕵️‍♀️ skan ZAP (baseline) – fail, gdy są HIGH
-      - name: Run ZAP Baseline scan (fail on HIGH)
+      - name: Run ZAP baseline scan (fail on HIGH)
         run: |
-          mkdir -p zap-reports
+          mkdir zap-reports
           docker run --rm --network host \
-            -v "$(pwd)/zap-reports:/zap/wrk" \
+            -v "$PWD/zap-reports:/zap/wrk" \
             ghcr.io/zaproxy/zaproxy:latest \
             zap-baseline.py \
               -t http://localhost:8080 \
-              -w HIGH \               # fail tylko gdy HIGH/Critical
+              -w HIGH \
               -J zap-report.json \
               -x zap-report.xml \
               -r zap-report.html
 
-      # 💾 artefakty
       - name: Upload ZAP reports
         uses: actions/upload-artifact@v4
         with:
           name: zap-dast-report
           path: zap-reports
 
-      # 🔻 posprzątaj kontenery po skanie
       - name: Stop application stack
         if: always()
-        run: docker compose -f docker-compose.yml down --remove-orphans
-
+        run: docker compose down --remove-orphans
